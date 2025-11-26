@@ -1,4 +1,4 @@
-const { Transaction, InventoryItem, User } = require('../models');
+const { Transaction, InventoryItem, User, DailyInventory } = require('../models');
 const { Op } = require('sequelize');
 const sequelize = require('../config/db');
 
@@ -612,6 +612,7 @@ const createBatchInventoryTransactions = async (req, res) => {
 
         // Parse and validate date
         const transactionDate = new Date(date);
+        const targetDateStr = transactionDate.toISOString().split('T')[0];
         const today = new Date();
         today.setHours(23, 59, 59, 999);
         
@@ -631,11 +632,39 @@ const createBatchInventoryTransactions = async (req, res) => {
           throw new Error(`Inventory item not found: ${inventoryItemId}`);
         }
 
-        // Note: Skipping detailed stock availability check for batch operation performance
-        // Relying on frontend logic or subsequent validation if strict consistency is needed
-        // Or could fetch current stock in one go beforehand if critical
+        // Handle 'beginning' type transactions specially
+        if (type === 'beginning') {
+          // Check if a daily inventory record exists for this date
+          const dailyEntry = await DailyInventory.findOne({
+            where: {
+              inventoryItemId,
+              date: targetDateStr
+            },
+            transaction: t
+          });
 
-        // Create the transaction
+          if (dailyEntry) {
+            // Update the existing daily entry
+            await dailyEntry.update({
+              beginning: qty,
+              updatedBy: userId
+            }, { transaction: t });
+          } else {
+            // Create a new daily entry if it doesn't exist
+            await DailyInventory.create({
+              inventoryItemId,
+              date: targetDateStr,
+              beginning: qty,
+              inQuantity: 0,
+              outQuantity: 0,
+              spoilage: 0,
+              remaining: qty, // Will be auto-calculated by hook, but setting initial value
+              updatedBy: userId
+            }, { transaction: t });
+          }
+        }
+
+        // Create the transaction record (for history)
         const newTransaction = await Transaction.create({
           inventoryItemId,
           userId,

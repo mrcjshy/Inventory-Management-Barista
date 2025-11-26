@@ -22,9 +22,26 @@ const dailyInventoryRoutes = require('./routes/dailyInventoryRoutes');
 // Initialize Express app
 const app = express();
 
-// CORS configuration
+// Define allowed origins explicitly
+const allowedOrigins = [
+  'https://acacia-inventorymanagement.vercel.app', // Production Vercel URL
+  'http://localhost:3000',                        // Local React
+  'http://localhost:5173'                         // Local Vite (just in case)
+];
+
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if the origin is in the allowed list
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('Blocked by CORS:', origin); // Log the blocked origin for debugging
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true

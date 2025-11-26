@@ -6,7 +6,7 @@ const {
   Settings,
   Transaction 
 } = require('../models');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 const seedDatabase = async () => {
   try {

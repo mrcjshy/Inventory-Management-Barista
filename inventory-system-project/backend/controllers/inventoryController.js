@@ -198,13 +198,15 @@ const getInventoryByDate = async (req, res) => {
     const inventoryItems = await InventoryItem.findAll({
       where: { isActive: true },
       attributes: ['id', 'name', 'unit', 'category', 'beginning', 'isActive', 'createdAt', 'updatedAt'],
-      order: [['category', 'ASC'], ['name', 'ASC']]
+      order: [['category', 'ASC'], ['name', 'ASC']],
+      raw: true
     });
 
     // 2. Fetch DailyInventory records for the target date
     const dailyInventoryEntries = await DailyInventory.findAll({
       where: { date: targetDateStr },
-      attributes: ['inventoryItemId', 'beginning', 'inQuantity', 'outQuantity', 'spoilage', 'remaining']
+      attributes: ['inventoryItemId', 'beginning', 'inQuantity', 'outQuantity', 'spoilage', 'remaining'],
+      raw: true
     });
 
     // Create a map for quick lookup of daily entries
@@ -225,7 +227,8 @@ const getInventoryByDate = async (req, res) => {
     // Fetch previous day's DailyInventory entries to maintain continuity
     const previousDailyEntries = await DailyInventory.findAll({
       where: { date: previousDateStr },
-      attributes: ['inventoryItemId', 'remaining']
+      attributes: ['inventoryItemId', 'remaining'],
+      raw: true
     });
 
     console.log('Found ' + previousDailyEntries.length + ' records for date: ' + previousDateStr);
@@ -247,7 +250,8 @@ const getInventoryByDate = async (req, res) => {
           ]
         }
       },
-      attributes: ['inventoryItemId', 'type', 'quantity']
+      attributes: ['inventoryItemId', 'type', 'quantity'],
+      raw: true
     });
 
     const todayTransactions = await Transaction.findAll({
@@ -259,7 +263,8 @@ const getInventoryByDate = async (req, res) => {
           ]
         }
       },
-      attributes: ['inventoryItemId', 'type', 'quantity']
+      attributes: ['inventoryItemId', 'type', 'quantity'],
+      raw: true
     });
 
     // Helper function to aggregate transactions by item ID
@@ -317,6 +322,7 @@ const getInventoryByDate = async (req, res) => {
       }
 
       if (itemId === 1) {
+        console.log('Processing Item:', item.name, 'ID:', itemId, 'Yesterday Value:', yesterdayMap[itemId]);
         console.log('Debug Item 1: Map Value =', yesterdayMap[1], ' | Final Beginning =', todayBeginning);
       }
 

@@ -233,6 +233,15 @@ const getInventoryByDate = async (req, res) => {
 
     console.log('Found ' + previousDailyEntries.length + ' records for date: ' + previousDateStr);
 
+    console.log('\n🔍 YESTERDAY RECORDS RAW DATA:');
+    console.log('   - Found records:', previousDailyEntries.length);
+    if (previousDailyEntries.length > 0) {
+      console.log('   - First record columns:', Object.keys(previousDailyEntries[0]));
+      console.log('   - First record data:', previousDailyEntries[0]);
+      console.log('   - inventoryItemId type:', typeof previousDailyEntries[0].inventoryItemId);
+      console.log('   - remaining value:', previousDailyEntries[0].remaining);
+    }
+
     const yesterdayMap = {};
     previousDailyEntries.forEach(entry => {
       const key = String(entry.inventoryItemId);
@@ -241,6 +250,15 @@ const getInventoryByDate = async (req, res) => {
     });
     console.log('✅ Yesterday Map built with keys:', Object.keys(yesterdayMap));
     console.log('✅ Yesterday Map full contents:', yesterdayMap);
+    
+    console.log('\n========================================');
+    console.log('📊 YESTERDAY MAP DEBUG:');
+    console.log('   - Total keys:', Object.keys(yesterdayMap).length);
+    console.log('   - All keys:', Object.keys(yesterdayMap));
+    console.log('   - Full map contents:', JSON.stringify(yesterdayMap, null, 2));
+    console.log('   - Sample access test for "1":', yesterdayMap['1']);
+    console.log('   - Sample access test for "2":', yesterdayMap['2']);
+    console.log('========================================\n');
 
     // Fetch ALL relevant transactions in TWO queries
     const previousDayTransactions = await Transaction.findAll({

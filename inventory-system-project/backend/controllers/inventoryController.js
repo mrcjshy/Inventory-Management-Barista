@@ -232,7 +232,8 @@ const getInventoryByDate = async (req, res) => {
 
     const yesterdayMap = {};
     previousDailyEntries.forEach(entry => {
-      yesterdayMap[entry.inventoryItemId] = entry.remaining;
+      const key = parseInt(entry.inventoryItemId, 10);
+      yesterdayMap[key] = entry.remaining;
     });
     console.log('Yesterday Map Keys:', Object.keys(yesterdayMap));
 
@@ -282,7 +283,7 @@ const getInventoryByDate = async (req, res) => {
 
     // 4. FOR EACH ITEM, construct the data using Priority Logic
     const computedInventory = inventoryItems.map(item => {
-      const itemId = item.id;
+      const itemId = parseInt(item.id, 10);
       
       // PRIORITY 1: If a DailyInventory record exists, use it DIRECTLY
       if (dailyMap[itemId]) {
@@ -313,6 +314,10 @@ const getInventoryByDate = async (req, res) => {
         todayBeginning = yesterdayMap[itemId] || 0;
       } else {
         todayBeginning = 0;
+      }
+
+      if (itemId === 1) {
+        console.log('Debug Item 1: Map Value =', yesterdayMap[1], ' | Final Beginning =', todayBeginning);
       }
 
       const todayIn = todayTrans.in;

@@ -223,17 +223,18 @@ const getInventoryByDate = async (req, res) => {
     console.log('Fetching history for date:', previousDateStr);
 
     // Fetch previous day's DailyInventory entries to maintain continuity
-    // (Already implemented but verifying usage)
     const previousDailyEntries = await DailyInventory.findAll({
       where: { date: previousDateStr },
       attributes: ['inventoryItemId', 'remaining']
     });
 
-    // Create a map for quick lookup of yesterday's remaining values
-    const yesterdayMap = new Map();
+    console.log('Found ' + previousDailyEntries.length + ' records for date: ' + previousDateStr);
+
+    const yesterdayMap = {};
     previousDailyEntries.forEach(entry => {
-      yesterdayMap.set(entry.inventoryItemId, entry.remaining);
+      yesterdayMap[entry.inventoryItemId] = entry.remaining;
     });
+    console.log('Yesterday Map Keys:', Object.keys(yesterdayMap));
 
     // Fetch ALL relevant transactions in TWO queries
     const previousDayTransactions = await Transaction.findAll({
@@ -308,14 +309,9 @@ const getInventoryByDate = async (req, res) => {
       const todayTrans = todayMap[itemId] || { beginning: 0, in: 0, out: 0, spoilage: 0 };
 
       let todayBeginning = 0;
-      
-      // IF (Yesterday's Record Exists in yesterdayMap) -> Use Yesterday's Remaining as Today's Beginning
-      if (yesterdayMap.has(itemId)) {
-        todayBeginning = yesterdayMap.get(itemId) || 0;
+      if (yesterdayMap[itemId] !== undefined) {
+        todayBeginning = yesterdayMap[itemId] || 0;
       } else {
-        // ELSE -> Default to 0 (or master beginning if this is day 1)
-        // Note: We only fallback to master 'beginning' if there is absolutely NO history found
-        // But for day-to-day continuity, 0 is safer than recalculating from scratch without context
         todayBeginning = 0;
       }
 

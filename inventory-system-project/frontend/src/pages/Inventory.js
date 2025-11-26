@@ -145,14 +145,16 @@ const Inventory = () => {
 
     setSaving(true);
     try {
-      // Create transactions for each pending change
+      // Prepare batch transactions
+      const transactions = [];
+
       for (const [itemId, changes] of Object.entries(pendingChanges)) {
         const item = inventoryData.find(i => i.id === parseInt(itemId));
         if (!item) continue;
 
-        // Create transactions for beginning changes (use 'beginning' type)
+        // Create transaction objects for beginning changes (use 'beginning' type)
         if (changes.beginning !== undefined) {
-          await transactionService.createInventoryTransaction({
+          transactions.push({
             inventoryItemId: parseInt(itemId),
             type: 'beginning',
             quantity: changes.beginning,
@@ -161,9 +163,9 @@ const Inventory = () => {
           });
         }
 
-        // Create transactions for in, out, spoilage changes
+        // Create transaction objects for in, out, spoilage changes
         if (changes.in && changes.in > 0) {
-          await transactionService.createInventoryTransaction({
+          transactions.push({
             inventoryItemId: parseInt(itemId),
             type: 'in',
             quantity: changes.in,
@@ -173,7 +175,7 @@ const Inventory = () => {
         }
 
         if (changes.out && changes.out > 0) {
-          await transactionService.createInventoryTransaction({
+          transactions.push({
             inventoryItemId: parseInt(itemId),
             type: 'out',
             quantity: changes.out,
@@ -183,7 +185,7 @@ const Inventory = () => {
         }
 
         if (changes.spoilage && changes.spoilage > 0) {
-          await transactionService.createInventoryTransaction({
+          transactions.push({
             inventoryItemId: parseInt(itemId),
             type: 'spoilage',
             quantity: changes.spoilage,
@@ -191,6 +193,11 @@ const Inventory = () => {
             notes: `Spoilage for ${selectedDate}`
           });
         }
+      }
+
+      // Send batch request if there are transactions to process
+      if (transactions.length > 0) {
+        await transactionService.createBatchInventoryTransactions(transactions);
       }
 
       // Clear pending changes and refresh data
@@ -670,4 +677,4 @@ const Inventory = () => {
   );
 };
 
-export default Inventory; 
+export default Inventory;

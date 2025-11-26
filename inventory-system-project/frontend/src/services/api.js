@@ -110,6 +110,7 @@ export const transactionService = {
   getStatistics: (params) => api.get('/transactions/statistics', { params }),
   createTransaction: (transactionData) => api.post('/transactions', transactionData),
   createInventoryTransaction: (transactionData) => api.post('/transactions/inventory', transactionData),
+  createBatchInventoryTransactions: (transactions) => api.post('/transactions/batch-inventory', { transactions }),
   getTopOutgoingProducts: (params) => api.get('/transactions/top-outgoing', { params }),
   getSystemDate: () => api.get('/transactions/system-date')
 };
@@ -143,4 +144,4 @@ export const dailyInventoryService = {
   getDailyInventorySummary: (params) => api.get('/daily-inventory/summary', { params })
 };
 
-export default api; 
+export default api;

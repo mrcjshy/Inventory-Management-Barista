@@ -6,6 +6,7 @@ const {
   getStatistics, 
   createTransaction,
   createInventoryTransaction,
+  createBatchInventoryTransactions,
   getTopOutgoingProducts,
   getSystemDate
 } = require('../controllers/transactionController');
@@ -35,4 +36,7 @@ router.post('/', createTransaction);
 // POST /api/transactions/inventory - Create a new inventory transaction (date-based)
 router.post('/inventory', createInventoryTransaction);
 
-module.exports = router; 
+// POST /api/transactions/batch-inventory - Batch create inventory transactions
+router.post('/batch-inventory', createBatchInventoryTransactions);
+
+module.exports = router;

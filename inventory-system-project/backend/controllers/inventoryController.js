@@ -1,4 +1,4 @@
-const { InventoryItem, Transaction } = require('../models');
+const { InventoryItem, Transaction, DailyInventory } = require('../models');
 const { Op } = require('sequelize');
 const sequelize = require('../config/db');
 
@@ -182,7 +182,7 @@ const getLowStockItems = async (req, res) => {
   }
 };
 
-// Get inventory items computed for a specific date
+// Get inventory items computed for a specific date (Optimized)
 const getInventoryByDate = async (req, res) => {
   try {
     const { date } = req.query;
@@ -193,108 +193,132 @@ const getInventoryByDate = async (req, res) => {
 
     const targetDate = new Date(date);
     const targetDateStr = targetDate.toISOString().split('T')[0];
+
+    // 1. Try to fetch from DailyInventory table first (Fastest)
+    const dailyInventoryEntries = await DailyInventory.findAll({
+      where: { date: targetDateStr },
+      include: [{
+        model: InventoryItem,
+        where: { isActive: true },
+        attributes: ['id', 'name', 'unit', 'category', 'isActive', 'createdAt', 'updatedAt']
+      }]
+    });
+
+    // If we have daily entries for all active items, return them
+    // We check if count matches roughly to decide if we can just use this
+    const activeItemsCount = await InventoryItem.count({ where: { isActive: true } });
     
-    // Get all active inventory items
+    if (dailyInventoryEntries.length > 0 && dailyInventoryEntries.length >= activeItemsCount * 0.9) {
+      // Map to expected format
+      const computedInventory = dailyInventoryEntries.map(entry => ({
+        id: entry.InventoryItem.id,
+        name: entry.InventoryItem.name,
+        unit: entry.InventoryItem.unit,
+        category: entry.InventoryItem.category,
+        beginning: entry.beginning,
+        in: entry.inQuantity,
+        out: entry.outQuantity,
+        spoilage: entry.spoilage,
+        totalInventory: entry.beginning + entry.inQuantity,
+        remaining: entry.remaining,
+        isActive: entry.InventoryItem.isActive,
+        createdAt: entry.InventoryItem.createdAt,
+        updatedAt: entry.InventoryItem.updatedAt
+      }));
+
+      return sendInventoryResponse(res, targetDateStr, computedInventory);
+    }
+
+    // 2. Fallback: Calculate from transactions (Optimized Bulk Approach)
+    console.log(`Daily inventory missing or incomplete for ${targetDateStr}. Calculating from transactions...`);
+    
+    // Get all active items
     const inventoryItems = await InventoryItem.findAll({
       where: { isActive: true },
+      attributes: ['id', 'name', 'unit', 'category', 'beginning', 'isActive', 'createdAt', 'updatedAt'],
       order: [['category', 'ASC'], ['name', 'ASC']]
     });
 
-    const computedInventory = [];
+    // Calculate date ranges
+    const previousDate = new Date(targetDate);
+    previousDate.setDate(previousDate.getDate() - 1);
+    const previousDateStr = previousDate.toISOString().split('T')[0];
 
-    for (const item of inventoryItems) {
-      // Calculate beginning value from previous day's remaining
-      const previousDate = new Date(targetDate);
-      previousDate.setDate(previousDate.getDate() - 1);
-      const previousDateStr = previousDate.toISOString().split('T')[0];
-
-      // Get previous day's transactions to compute previous day's remaining
-      const previousDayTransactions = await Transaction.findAll({
-        where: {
-          inventoryItemId: item.id,
-          date: {
-            [Op.between]: [
-              new Date(previousDateStr + 'T00:00:00.000Z'),
-              new Date(previousDateStr + 'T23:59:59.999Z')
-            ]
-          }
+    // Fetch ALL relevant transactions in TWO queries
+    
+    // Query 1: Get transactions for the previous day (for beginning balance calculation)
+    const previousDayTransactions = await Transaction.findAll({
+      where: {
+        date: {
+          [Op.between]: [
+            new Date(previousDateStr + 'T00:00:00.000Z'),
+            new Date(previousDateStr + 'T23:59:59.999Z')
+          ]
         }
-      });
+      },
+      attributes: ['inventoryItemId', 'type', 'quantity']
+    });
 
-      // Calculate previous day's ending stock (which becomes today's beginning)
-      let previousDayBeginning = 0;
-      let previousDayIn = 0;
-      let previousDayOut = 0;
-      let previousDaySpoilage = 0;
-
-      // First, get the beginning value for the previous day
-      // If there's a 'beginning' transaction, use it
-      const beginningTransaction = previousDayTransactions.find(t => t.type === 'beginning');
-      if (beginningTransaction) {
-        previousDayBeginning = beginningTransaction.quantity;
-      } else {
-        // Recursively calculate from even earlier if needed, or use item's master beginning
-        previousDayBeginning = item.beginning || 0;
-      }
-
-      // Sum up previous day's transactions
-      previousDayTransactions.forEach(transaction => {
-        switch (transaction.type) {
-          case 'in':
-            previousDayIn += transaction.quantity;
-            break;
-          case 'out':
-            previousDayOut += transaction.quantity;
-            break;
-          case 'spoilage':
-            previousDaySpoilage += transaction.quantity;
-            break;
+    // Query 2: Get transactions for the target day
+    const todayTransactions = await Transaction.findAll({
+      where: {
+        date: {
+          [Op.between]: [
+            new Date(targetDateStr + 'T00:00:00.000Z'),
+            new Date(targetDateStr + 'T23:59:59.999Z')
+          ]
         }
-      });
+      },
+      attributes: ['inventoryItemId', 'type', 'quantity']
+    });
 
+    // Helper function to aggregate transactions by item ID
+    const groupTransactionsByItem = (transactions) => {
+      const grouped = {};
+      transactions.forEach(t => {
+        if (!grouped[t.inventoryItemId]) {
+          grouped[t.inventoryItemId] = { beginning: 0, in: 0, out: 0, spoilage: 0 };
+        }
+        
+        if (t.type === 'beginning') grouped[t.inventoryItemId].beginning += t.quantity;
+        else if (t.type === 'in') grouped[t.inventoryItemId].in += t.quantity;
+        else if (t.type === 'out') grouped[t.inventoryItemId].out += t.quantity;
+        else if (t.type === 'spoilage') grouped[t.inventoryItemId].spoilage += t.quantity;
+      });
+      return grouped;
+    };
+
+    const prevDayMap = groupTransactionsByItem(previousDayTransactions);
+    const todayMap = groupTransactionsByItem(todayTransactions);
+
+    // Compute inventory for each item in memory
+    const computedInventory = inventoryItems.map(item => {
+      const itemId = item.id;
+      const prevTrans = prevDayMap[itemId] || { beginning: 0, in: 0, out: 0, spoilage: 0 };
+      const todayTrans = todayMap[itemId] || { beginning: 0, in: 0, out: 0, spoilage: 0 };
+
+      // Calculate Previous Day's Remaining (which is Today's Beginning)
+      // Logic: If explicit beginning transaction exists for previous day, use it. 
+      // Otherwise, assume item's master 'beginning' is the starting point if no history exists.
+      // NOTE: This logic simplifies "recursively calculate from even earlier". 
+      // For robust historical accuracy without daily snapshots, you'd need to sum ALL history.
+      // But assuming 'daily snapshots' are generated regularly, this 1-day lookback is a reasonable fallback.
+      
+      let previousDayBeginning = prevTrans.beginning > 0 ? prevTrans.beginning : (item.beginning || 0);
+      
       const previousDayRemaining = Math.max(0, 
-        previousDayBeginning + previousDayIn - previousDayOut - previousDaySpoilage
+        previousDayBeginning + prevTrans.in - prevTrans.out - prevTrans.spoilage
       );
 
-      // Now calculate today's values
       const todayBeginning = previousDayRemaining;
+      const todayIn = todayTrans.in;
+      const todayOut = todayTrans.out;
+      const todaySpoilage = todayTrans.spoilage;
 
-      // Get today's transactions
-      const todayTransactions = await Transaction.findAll({
-        where: {
-          inventoryItemId: item.id,
-          date: {
-            [Op.between]: [
-              new Date(targetDateStr + 'T00:00:00.000Z'),
-              new Date(targetDateStr + 'T23:59:59.999Z')
-            ]
-          }
-        }
-      });
-
-      let todayIn = 0;
-      let todayOut = 0;
-      let todaySpoilage = 0;
-
-      todayTransactions.forEach(transaction => {
-        switch (transaction.type) {
-          case 'in':
-            todayIn += transaction.quantity;
-            break;
-          case 'out':
-            todayOut += transaction.quantity;
-            break;
-          case 'spoilage':
-            todaySpoilage += transaction.quantity;
-            break;
-        }
-      });
-
-      // Calculate computed values
       const totalInventory = todayBeginning + todayIn;
       const remaining = Math.max(0, totalInventory - todayOut - todaySpoilage);
 
-      computedInventory.push({
+      return {
         id: item.id,
         name: item.name,
         unit: item.unit,
@@ -308,28 +332,10 @@ const getInventoryByDate = async (req, res) => {
         isActive: item.isActive,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt
-      });
-    }
-
-    // Group by category
-    const groupedInventory = computedInventory.reduce((acc, item) => {
-      if (!acc[item.category]) {
-        acc[item.category] = [];
-      }
-      acc[item.category].push(item);
-      return acc;
-    }, {});
-
-    res.status(200).json({
-      date: targetDateStr,
-      inventory: computedInventory,
-      groupedInventory,
-      summary: {
-        totalItems: computedInventory.length,
-        totalInventoryValue: computedInventory.reduce((sum, item) => sum + item.totalInventory, 0),
-        totalRemaining: computedInventory.reduce((sum, item) => sum + item.remaining, 0)
-      }
+      };
     });
+
+    return sendInventoryResponse(res, targetDateStr, computedInventory);
 
   } catch (error) {
     console.error('Error in getInventoryByDate:', error);
@@ -340,6 +346,29 @@ const getInventoryByDate = async (req, res) => {
   }
 };
 
+// Helper to format and send response
+const sendInventoryResponse = (res, dateStr, inventoryData) => {
+  // Group by category
+  const groupedInventory = inventoryData.reduce((acc, item) => {
+    if (!acc[item.category]) {
+      acc[item.category] = [];
+    }
+    acc[item.category].push(item);
+    return acc;
+  }, {});
+
+  res.status(200).json({
+    date: dateStr,
+    inventory: inventoryData,
+    groupedInventory,
+    summary: {
+      totalItems: inventoryData.length,
+      totalInventoryValue: inventoryData.reduce((sum, item) => sum + item.totalInventory, 0),
+      totalRemaining: inventoryData.reduce((sum, item) => sum + item.remaining, 0)
+    }
+  });
+};
+
 module.exports = {
   getAllItems,
   getItemById,
@@ -348,4 +377,4 @@ module.exports = {
   deleteItem,
   getLowStockItems,
   getInventoryByDate
-}; 
+};

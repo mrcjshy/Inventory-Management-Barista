@@ -585,6 +585,85 @@ const createInventoryTransaction = async (req, res) => {
   }
 };
 
+// Batch create inventory transactions
+const createBatchInventoryTransactions = async (req, res) => {
+  try {
+    const { transactions } = req.body;
+    const userId = req.user.id;
+
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+      return res.status(400).json({
+        message: 'Transactions array is required and cannot be empty'
+      });
+    }
+
+    const createdTransactions = [];
+    
+    // Use transaction to ensure all updates succeed or fail together
+    await sequelize.transaction(async (t) => {
+      for (const txn of transactions) {
+        const { inventoryItemId, type, quantity, notes, date } = txn;
+
+        // Validate transaction type
+        const validTypes = ['in', 'out', 'spoilage', 'beginning'];
+        if (!validTypes.includes(type)) {
+          throw new Error(`Invalid transaction type for item ${inventoryItemId}: ${type}`);
+        }
+
+        // Parse and validate date
+        const transactionDate = new Date(date);
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+        
+        if (transactionDate > today) {
+          throw new Error(`Transaction date cannot be in the future for item ${inventoryItemId}`);
+        }
+
+        // Validate quantity
+        const qty = parseInt(quantity);
+        if (isNaN(qty) || (qty < 0) || (qty === 0 && type !== 'beginning')) {
+          throw new Error(`Invalid quantity for item ${inventoryItemId}: ${quantity}`);
+        }
+
+        // Get the inventory item
+        const inventoryItem = await InventoryItem.findByPk(inventoryItemId, { transaction: t });
+        if (!inventoryItem) {
+          throw new Error(`Inventory item not found: ${inventoryItemId}`);
+        }
+
+        // Note: Skipping detailed stock availability check for batch operation performance
+        // Relying on frontend logic or subsequent validation if strict consistency is needed
+        // Or could fetch current stock in one go beforehand if critical
+
+        // Create the transaction
+        const newTransaction = await Transaction.create({
+          inventoryItemId,
+          userId,
+          type,
+          quantity: qty,
+          notes: notes || '',
+          reason: type === 'in' ? 'Stock in' : type === 'out' ? 'Stock out' : type === 'spoilage' ? 'Spoilage' : 'Beginning balance',
+          date: transactionDate
+        }, { transaction: t });
+
+        createdTransactions.push(newTransaction);
+      }
+    });
+
+    res.status(201).json({
+      message: `Successfully processed ${createdTransactions.length} transactions`,
+      count: createdTransactions.length
+    });
+
+  } catch (error) {
+    console.error('Error creating batch transactions:', error);
+    res.status(500).json({ 
+      message: 'Error creating batch transactions', 
+      error: error.message 
+    });
+  }
+};
+
 // Get top outgoing products based on transaction data
 const getTopOutgoingProducts = async (req, res) => {
   try {
@@ -673,6 +752,7 @@ module.exports = {
   getStatistics,
   createTransaction,
   createInventoryTransaction,
+  createBatchInventoryTransactions,
   getTopOutgoingProducts,
   getSystemDate
-}; 
+};

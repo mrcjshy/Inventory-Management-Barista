@@ -194,58 +194,32 @@ const getInventoryByDate = async (req, res) => {
     const targetDate = new Date(date);
     const targetDateStr = targetDate.toISOString().split('T')[0];
 
-    // 1. Try to fetch from DailyInventory table first (Fastest)
-    const dailyInventoryEntries = await DailyInventory.findAll({
-      where: { date: targetDateStr },
-      include: [{
-        model: InventoryItem,
-        where: { isActive: true },
-        attributes: ['id', 'name', 'unit', 'category', 'isActive', 'createdAt', 'updatedAt']
-      }]
-    });
-
-    // If we have daily entries for all active items, return them
-    // We check if count matches roughly to decide if we can just use this
-    const activeItemsCount = await InventoryItem.count({ where: { isActive: true } });
-    
-    if (dailyInventoryEntries.length > 0 && dailyInventoryEntries.length >= activeItemsCount * 0.9) {
-      // Map to expected format
-      const computedInventory = dailyInventoryEntries.map(entry => ({
-        id: entry.InventoryItem.id,
-        name: entry.InventoryItem.name,
-        unit: entry.InventoryItem.unit,
-        category: entry.InventoryItem.category,
-        beginning: entry.beginning,
-        in: entry.inQuantity,
-        out: entry.outQuantity,
-        spoilage: entry.spoilage,
-        totalInventory: entry.beginning + entry.inQuantity,
-        remaining: entry.remaining,
-        isActive: entry.InventoryItem.isActive,
-        createdAt: entry.InventoryItem.createdAt,
-        updatedAt: entry.InventoryItem.updatedAt
-      }));
-
-      return sendInventoryResponse(res, targetDateStr, computedInventory);
-    }
-
-    // 2. Fallback: Calculate from transactions (Optimized Bulk Approach)
-    console.log(`Daily inventory missing or incomplete for ${targetDateStr}. Calculating from transactions...`);
-    
-    // Get all active items
+    // 1. Fetch all active items (Fastest)
     const inventoryItems = await InventoryItem.findAll({
       where: { isActive: true },
       attributes: ['id', 'name', 'unit', 'category', 'beginning', 'isActive', 'createdAt', 'updatedAt'],
       order: [['category', 'ASC'], ['name', 'ASC']]
     });
 
+    // 2. Fetch DailyInventory records for the target date
+    const dailyInventoryEntries = await DailyInventory.findAll({
+      where: { date: targetDateStr },
+      attributes: ['inventoryItemId', 'beginning', 'inQuantity', 'outQuantity', 'spoilage', 'remaining']
+    });
+
+    // Create a map for quick lookup of daily entries
+    const dailyMap = {};
+    dailyInventoryEntries.forEach(entry => {
+      dailyMap[entry.inventoryItemId] = entry;
+    });
+
+    // 3. Fetch transactions for calculation fallback
     // Calculate date ranges
     const previousDate = new Date(targetDate);
     previousDate.setDate(previousDate.getDate() - 1);
     const previousDateStr = previousDate.toISOString().split('T')[0];
 
     // Fetch ALL relevant transactions in TWO queries
-    
     // Query 1: Get transactions for the previous day (for beginning balance calculation)
     const previousDayTransactions = await Transaction.findAll({
       where: {
@@ -291,19 +265,35 @@ const getInventoryByDate = async (req, res) => {
     const prevDayMap = groupTransactionsByItem(previousDayTransactions);
     const todayMap = groupTransactionsByItem(todayTransactions);
 
-    // Compute inventory for each item in memory
+    // 4. FOR EACH ITEM, construct the data using Priority Logic
     const computedInventory = inventoryItems.map(item => {
       const itemId = item.id;
+      
+      // PRIORITY 1: If a DailyInventory record exists, use it DIRECTLY
+      if (dailyMap[itemId]) {
+        const entry = dailyMap[itemId];
+        return {
+          id: item.id,
+          name: item.name,
+          unit: item.unit,
+          category: item.category,
+          beginning: entry.beginning,
+          in: entry.inQuantity,
+          out: entry.outQuantity,
+          spoilage: entry.spoilage,
+          totalInventory: entry.beginning + entry.inQuantity,
+          remaining: entry.remaining,
+          isActive: item.isActive,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt
+        };
+      }
+
+      // PRIORITY 2: Fallback to calculation logic
       const prevTrans = prevDayMap[itemId] || { beginning: 0, in: 0, out: 0, spoilage: 0 };
       const todayTrans = todayMap[itemId] || { beginning: 0, in: 0, out: 0, spoilage: 0 };
 
       // Calculate Previous Day's Remaining (which is Today's Beginning)
-      // Logic: If explicit beginning transaction exists for previous day, use it. 
-      // Otherwise, assume item's master 'beginning' is the starting point if no history exists.
-      // NOTE: This logic simplifies "recursively calculate from even earlier". 
-      // For robust historical accuracy without daily snapshots, you'd need to sum ALL history.
-      // But assuming 'daily snapshots' are generated regularly, this 1-day lookback is a reasonable fallback.
-      
       let previousDayBeginning = prevTrans.beginning > 0 ? prevTrans.beginning : (item.beginning || 0);
       
       const previousDayRemaining = Math.max(0, 

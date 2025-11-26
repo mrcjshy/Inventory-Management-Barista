@@ -188,199 +188,122 @@ const getInventoryByDate = async (req, res) => {
     const { date } = req.query;
     
     if (!date) {
-      return res.status(400).json({ message: 'Date parameter is required' });
+      return res.status(400).json({ error: 'Date parameter is required' });
     }
 
-    const targetDate = new Date(date);
-    const targetDateStr = targetDate.toISOString().split('T')[0];
-
-    // 1. Fetch all active items (Fastest)
-    const inventoryItems = await InventoryItem.findAll({
+    // 1. Get all active items
+    const allItems = await InventoryItem.findAll({
       where: { isActive: true },
-      attributes: ['id', 'name', 'unit', 'category', 'beginning', 'isActive', 'createdAt', 'updatedAt'],
-      order: [['category', 'ASC'], ['name', 'ASC']],
+      order: [['category', 'ASC'], ['name', 'ASC']]
+    });
+
+    // 2. Calculate yesterday's date
+    const yesterday = new Date(date);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayDateStr = yesterday.toISOString().split('T')[0];
+    const todayDateStr = new Date(date).toISOString().split('T')[0];
+
+    // 3. Get TODAY's inventory records
+    const todayRecords = await DailyInventory.findAll({
+      where: { date: todayDateStr },
       raw: true
     });
 
-    // 2. Fetch DailyInventory records for the target date
-    const dailyInventoryEntries = await DailyInventory.findAll({
-      where: { date: targetDateStr },
-      attributes: ['inventoryItemId', 'beginning', 'inQuantity', 'outQuantity', 'spoilage', 'remaining'],
+    // 4. Get YESTERDAY's inventory records
+    const yesterdayRecords = await DailyInventory.findAll({
+      where: { date: yesterdayDateStr },
       raw: true
     });
 
-    // Create a map for quick lookup of daily entries (FORCE STRING KEYS)
-    const dailyMap = {};
-    dailyInventoryEntries.forEach(entry => {
-      const key = String(entry.inventoryItemId);
-      dailyMap[key] = entry;
+    console.log(`📅 Date: ${date}`);
+    console.log(`📅 Yesterday: ${yesterdayDateStr}`);
+    console.log(`📦 Today records found: ${todayRecords.length}`);
+    console.log(`📦 Yesterday records found: ${yesterdayRecords.length}`);
+
+    // 5. Build lookup maps - Checking both inventoryItemId and item_id as requested
+    const todayLookup = {};
+    todayRecords.forEach(r => {
+      const key = String(r.inventoryItemId || r.item_id); 
+      todayLookup[key] = r;
     });
 
-    // 3. Fetch transactions for calculation fallback
-    // Calculate date ranges
-    const targetDateObj = new Date(targetDateStr);
-    targetDateObj.setDate(targetDateObj.getDate() - 1);
-    const previousDateStr = targetDateObj.toISOString().split('T')[0];
-    
-    console.log('Fetching history for date:', previousDateStr);
-
-    // Fetch previous day's DailyInventory entries to maintain continuity
-    const previousDailyEntries = await DailyInventory.findAll({
-      where: { date: previousDateStr },
-      attributes: ['inventoryItemId', 'remaining'],
-      raw: true
+    const yesterdayLookup = {};
+    yesterdayRecords.forEach(r => {
+      const key = String(r.inventoryItemId || r.item_id); 
+      yesterdayLookup[key] = r.remaining;
+      console.log(`✅ Stored yesterday: ID=${key}, remaining=${r.remaining}`);
     });
 
-    console.log('Found ' + previousDailyEntries.length + ' records for date: ' + previousDateStr);
+    // 6. Build response for each item
+    const response = allItems.map(item => {
+      const itemId = String(item.id);
+      const todayData = todayLookup[itemId];
+      const yesterdayRemaining = yesterdayLookup[itemId] || 0;
 
-    console.log('\n🔍 YESTERDAY RECORDS RAW DATA:');
-    console.log('   - Found records:', previousDailyEntries.length);
-    if (previousDailyEntries.length > 0) {
-      console.log('   - First record columns:', Object.keys(previousDailyEntries[0]));
-      console.log('   - First record data:', previousDailyEntries[0]);
-      console.log('   - inventoryItemId type:', typeof previousDailyEntries[0].inventoryItemId);
-      console.log('   - remaining value:', previousDailyEntries[0].remaining);
-    }
+      console.log(`\n🔍 ${item.name} (ID: ${itemId})`);
+      console.log(`   Yesterday remaining: ${yesterdayRemaining}`);
+      console.log(`   Today has entry: ${!!todayData}`);
 
-    const yesterdayMap = {};
-    previousDailyEntries.forEach(entry => {
-      const key = String(entry.inventoryItemId);
-      yesterdayMap[key] = entry.remaining;
-      console.log(`📥 Storing in yesterdayMap: key="${key}" value=${entry.remaining}`);
-    });
-    console.log('✅ Yesterday Map built with keys:', Object.keys(yesterdayMap));
-    console.log('✅ Yesterday Map full contents:', yesterdayMap);
-    
-    console.log('\n========================================');
-    console.log('📊 YESTERDAY MAP DEBUG:');
-    console.log('   - Total keys:', Object.keys(yesterdayMap).length);
-    console.log('   - All keys:', Object.keys(yesterdayMap));
-    console.log('   - Full map contents:', JSON.stringify(yesterdayMap, null, 2));
-    console.log('   - Sample access test for "1":', yesterdayMap['1']);
-    console.log('   - Sample access test for "2":', yesterdayMap['2']);
-    console.log('========================================\n');
-
-    // Fetch ALL relevant transactions in TWO queries
-    const previousDayTransactions = await Transaction.findAll({
-      where: {
-        date: {
-          [Op.between]: [
-            new Date(previousDateStr + 'T00:00:00.000Z'),
-            new Date(previousDateStr + 'T23:59:59.999Z')
-          ]
-        }
-      },
-      attributes: ['inventoryItemId', 'type', 'quantity'],
-      raw: true
-    });
-
-    const todayTransactions = await Transaction.findAll({
-      where: {
-        date: {
-          [Op.between]: [
-            new Date(targetDateStr + 'T00:00:00.000Z'),
-            new Date(targetDateStr + 'T23:59:59.999Z')
-          ]
-        }
-      },
-      attributes: ['inventoryItemId', 'type', 'quantity'],
-      raw: true
-    });
-
-    // Helper function to aggregate transactions by item ID (FORCE STRING KEYS)
-    const groupTransactionsByItem = (transactions) => {
-      const grouped = {};
-      transactions.forEach(t => {
-        const key = String(t.inventoryItemId);
-        if (!grouped[key]) {
-          grouped[key] = { beginning: 0, in: 0, out: 0, spoilage: 0 };
-        }
-        
-        if (t.type === 'beginning') grouped[key].beginning += t.quantity;
-        else if (t.type === 'in') grouped[key].in += t.quantity;
-        else if (t.type === 'out') grouped[key].out += t.quantity;
-        else if (t.type === 'spoilage') grouped[key].spoilage += t.quantity;
-      });
-      return grouped;
-    };
-
-    const prevDayMap = groupTransactionsByItem(previousDayTransactions);
-    const todayMap = groupTransactionsByItem(todayTransactions);
-
-    // 4. FOR EACH ITEM, construct the data using Priority Logic
-    const computedInventory = inventoryItems.map(item => {
-      const itemIdStr = String(item.id);
-      
-      console.log(`\n🔍 Checking item ${item.name} (ID: "${itemIdStr}")`);
-      // console.log('   Map currently has keys:', Object.keys(yesterdayMap)); // Too verbose
-      console.log('   Direct access test:', yesterdayMap[itemIdStr]);
-      
-      const yesterdayValue = yesterdayMap[itemIdStr];
-      
-      console.log(`   - Found value: ${yesterdayValue}`);
-      console.log(`   - Value type: ${typeof yesterdayValue}`);
-
-      // PRIORITY 1: If a DailyInventory record exists, use it DIRECTLY
-      if (dailyMap[itemIdStr]) { 
-        const entry = dailyMap[itemIdStr];
-        console.log(`   ✅ Using TODAY's manual entry`);
+      // If today has data, use it
+      if (todayData) {
         return {
           id: item.id,
           name: item.name,
           unit: item.unit,
           category: item.category,
-          beginning: entry.beginning,
-          in: entry.inQuantity,
-          out: entry.outQuantity,
-          spoilage: entry.spoilage,
-          totalInventory: entry.beginning + entry.inQuantity,
-          remaining: entry.remaining,
+          beginning: todayData.beginning,
+          in: todayData.inQuantity,
+          out: todayData.outQuantity,
+          spoilage: todayData.spoilage,
+          totalInventory: todayData.beginning + todayData.inQuantity,
+          remaining: todayData.remaining,
           isActive: item.isActive,
+          hasManualEntry: true,
           createdAt: item.createdAt,
           updatedAt: item.updatedAt
         };
       }
 
-      // PRIORITY 2: Fallback to calculation logic
-      const todayTrans = todayMap[itemIdStr] || { beginning: 0, in: 0, out: 0, spoilage: 0 };
-
-      // Carry over from yesterday
-      const beginning = yesterdayValue !== undefined ? yesterdayValue : 0;
-      console.log(`   📦 CARRY OVER - Beginning set to: ${beginning}`);
-
-      const todayBeginning = beginning;
-      const todayIn = todayTrans.in;
-      const todayOut = todayTrans.out;
-      const todaySpoilage = todayTrans.spoilage;
-
-      const totalInventory = todayBeginning + todayIn;
-      const remaining = Math.max(0, totalInventory - todayOut - todaySpoilage);
-
+      // Otherwise, carry over from yesterday
       return {
         id: item.id,
         name: item.name,
         unit: item.unit,
         category: item.category,
-        beginning: todayBeginning,
-        in: todayIn,
-        out: todayOut,
-        spoilage: todaySpoilage,
-        totalInventory,
-        remaining,
+        beginning: yesterdayRemaining,  // ← THIS IS THE MAGIC LINE
+        in: 0,
+        out: 0,
+        spoilage: 0,
+        totalInventory: yesterdayRemaining,
+        remaining: yesterdayRemaining,
         isActive: item.isActive,
+        hasManualEntry: false,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt
       };
     });
 
-    return sendInventoryResponse(res, targetDateStr, computedInventory);
+    // Maintain response structure expected by frontend
+    const groupedInventory = response.reduce((acc, item) => {
+      if (!acc[item.category]) acc[item.category] = [];
+      acc[item.category].push(item);
+      return acc;
+    }, {});
+
+    res.json({
+      date: todayDateStr,
+      inventory: response,
+      groupedInventory,
+      summary: {
+        totalItems: response.length,
+        totalInventoryValue: response.reduce((sum, item) => sum + item.totalInventory, 0),
+        totalRemaining: response.reduce((sum, item) => sum + item.remaining, 0)
+      }
+    });
 
   } catch (error) {
-    console.error('Error in getInventoryByDate:', error);
-    res.status(500).json({ 
-      message: 'Error fetching inventory by date', 
-      error: error.message 
-    });
+    console.error('❌ Error:', error);
+    res.status(500).json({ error: 'Failed to fetch inventory', details: error.message });
   }
 };
 

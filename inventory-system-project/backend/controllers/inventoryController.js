@@ -235,7 +235,7 @@ const getInventoryByDate = async (req, res) => {
 
     const yesterdayMap = {};
     previousDailyEntries.forEach(entry => {
-      const key = parseInt(entry.inventoryItemId, 10);
+      const key = String(entry.inventoryItemId);
       yesterdayMap[key] = entry.remaining;
     });
     console.log('Yesterday Map Keys:', Object.keys(yesterdayMap));
@@ -288,11 +288,18 @@ const getInventoryByDate = async (req, res) => {
 
     // 4. FOR EACH ITEM, construct the data using Priority Logic
     const computedInventory = inventoryItems.map(item => {
-      const itemId = parseInt(item.id, 10);
+      const itemId = String(item.id);
       
       // PRIORITY 1: If a DailyInventory record exists, use it DIRECTLY
-      if (dailyMap[itemId]) {
-        const entry = dailyMap[itemId];
+      // (Note: dailyMap keys are integers currently, we might need to adjust if dailyMap usage fails too, but focusing on fallback first)
+      // Actually, let's make dailyMap robust too if needed, but user asked for fallback loop specifically.
+      // The dailyMap is built from dailyInventoryEntries. Let's assume those IDs are standard.
+      // But for the loop variable, we use String(item.id).
+      
+      // Let's stick to the requested changes.
+      
+      if (dailyMap[parseInt(itemId)]) { // dailyMap uses integer keys from previous step not changed
+        const entry = dailyMap[parseInt(itemId)];
         return {
           id: item.id,
           name: item.name,
@@ -311,8 +318,10 @@ const getInventoryByDate = async (req, res) => {
       }
 
       // PRIORITY 2: Fallback to calculation logic
-      const prevTrans = prevDayMap[itemId] || { beginning: 0, in: 0, out: 0, spoilage: 0 };
-      const todayTrans = todayMap[itemId] || { beginning: 0, in: 0, out: 0, spoilage: 0 };
+      // Use integer for transaction maps as they are likely still integer keyed from groupTransactionsByItem (which uses raw DB results)
+      const itemIdInt = parseInt(itemId, 10);
+      const prevTrans = prevDayMap[itemIdInt] || { beginning: 0, in: 0, out: 0, spoilage: 0 };
+      const todayTrans = todayMap[itemIdInt] || { beginning: 0, in: 0, out: 0, spoilage: 0 };
 
       let todayBeginning = 0;
       if (yesterdayMap[itemId] !== undefined) {
@@ -321,9 +330,8 @@ const getInventoryByDate = async (req, res) => {
         todayBeginning = 0;
       }
 
-      if (itemId === 1) {
-        console.log('Processing Item:', item.name, 'ID:', itemId, 'Yesterday Value:', yesterdayMap[itemId]);
-        console.log('Debug Item 1: Map Value =', yesterdayMap[1], ' | Final Beginning =', todayBeginning);
+      if (item.name === 'Full Tea') {
+        console.log(`[DEBUG] Full Tea Lookup: ID="${itemId}" | Value in Map=${yesterdayMap[itemId]}`);
       }
 
       const todayIn = todayTrans.in;

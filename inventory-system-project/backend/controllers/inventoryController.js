@@ -219,8 +219,18 @@ const getInventoryByDate = async (req, res) => {
     previousDate.setDate(previousDate.getDate() - 1);
     const previousDateStr = previousDate.toISOString().split('T')[0];
 
+    // Fetch previous day's DailyInventory entries to maintain continuity
+    const previousDailyEntries = await DailyInventory.findAll({
+      where: { date: previousDateStr },
+      attributes: ['inventoryItemId', 'remaining']
+    });
+
+    const previousDailyMap = previousDailyEntries.reduce((acc, entry) => {
+      acc[entry.inventoryItemId] = entry;
+      return acc;
+    }, {});
+
     // Fetch ALL relevant transactions in TWO queries
-    // Query 1: Get transactions for the previous day (for beginning balance calculation)
     const previousDayTransactions = await Transaction.findAll({
       where: {
         date: {
@@ -233,7 +243,6 @@ const getInventoryByDate = async (req, res) => {
       attributes: ['inventoryItemId', 'type', 'quantity']
     });
 
-    // Query 2: Get transactions for the target day
     const todayTransactions = await Transaction.findAll({
       where: {
         date: {
@@ -293,14 +302,17 @@ const getInventoryByDate = async (req, res) => {
       const prevTrans = prevDayMap[itemId] || { beginning: 0, in: 0, out: 0, spoilage: 0 };
       const todayTrans = todayMap[itemId] || { beginning: 0, in: 0, out: 0, spoilage: 0 };
 
-      // Calculate Previous Day's Remaining (which is Today's Beginning)
-      let previousDayBeginning = prevTrans.beginning > 0 ? prevTrans.beginning : (item.beginning || 0);
-      
-      const previousDayRemaining = Math.max(0, 
-        previousDayBeginning + prevTrans.in - prevTrans.out - prevTrans.spoilage
-      );
+      let todayBeginning = 0;
+      if (previousDailyMap[itemId]) {
+        todayBeginning = previousDailyMap[itemId].remaining || 0;
+      } else {
+        let previousDayBeginning = prevTrans.beginning > 0 ? prevTrans.beginning : (item.beginning || 0);
+        const previousDayRemaining = Math.max(0, 
+          previousDayBeginning + prevTrans.in - prevTrans.out - prevTrans.spoilage
+        );
+        todayBeginning = previousDayRemaining;
+      }
 
-      const todayBeginning = previousDayRemaining;
       const todayIn = todayTrans.in;
       const todayOut = todayTrans.out;
       const todaySpoilage = todayTrans.spoilage;

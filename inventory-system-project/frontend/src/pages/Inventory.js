@@ -88,10 +88,10 @@ const Inventory = () => {
     return selectedDate === today;
   };
 
-  const validateInput = (value, field) => {
-    if (value === '' || value === null) return field === 'beginning' ? 0 : '';
-    const num = parseInt(value);
-    if (isNaN(num) || num < 0) return field === 'beginning' ? 0 : '';
+  const validateInput = (value) => {
+    if (value === '' || value === null || value === undefined) return 0;
+    const num = parseInt(value, 10);
+    if (isNaN(num) || num < 0) return 0;
     return num;
   };
 
@@ -111,7 +111,7 @@ const Inventory = () => {
 
   const handleInputChange = (itemId, field, value) => {
     // Allow editing for any date, not just today
-    const validatedValue = validateInput(value, field);
+    const validatedValue = validateInput(value);
     
     // Update local state immediately for responsiveness
     setInventoryData(prevData => 
@@ -167,7 +167,7 @@ const Inventory = () => {
         }
 
         // Create transaction objects for in, out, spoilage changes
-        if (changes.in && changes.in > 0) {
+        if (changes.in !== undefined) {
           transactions.push({
             inventoryItemId: parseInt(itemId),
             type: 'in',
@@ -177,7 +177,7 @@ const Inventory = () => {
           });
         }
 
-        if (changes.out && changes.out > 0) {
+        if (changes.out !== undefined) {
           transactions.push({
             inventoryItemId: parseInt(itemId),
             type: 'out',
@@ -187,7 +187,7 @@ const Inventory = () => {
           });
         }
 
-        if (changes.spoilage && changes.spoilage > 0) {
+        if (changes.spoilage !== undefined) {
           transactions.push({
             inventoryItemId: parseInt(itemId),
             type: 'spoilage',

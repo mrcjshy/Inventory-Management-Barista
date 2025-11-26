@@ -624,7 +624,7 @@ const createBatchInventoryTransactions = async (req, res) => {
 
         // Validate quantity
         const qty = parseInt(quantity);
-        if (isNaN(qty) || (qty < 0) || (qty === 0 && type !== 'beginning')) {
+        if (isNaN(qty) || qty < 0) {
           throw new Error(`Invalid quantity for item ${inventoryItemId}: ${quantity}`);
         }
 
@@ -638,7 +638,7 @@ const createBatchInventoryTransactions = async (req, res) => {
         // Relying on frontend logic or subsequent validation if strict consistency is needed
         // Or could fetch current stock in one go beforehand if critical
 
-        // Find or create DailyInventory entry to keep scoreboard updated
+        // Sync with DailyInventory
         let dailyEntry = await DailyInventory.findOne({
           where: {
             inventoryItemId,
@@ -651,38 +651,40 @@ const createBatchInventoryTransactions = async (req, res) => {
           dailyEntry = await DailyInventory.create({
             inventoryItemId,
             date: targetDateStr,
-            beginning: type === 'beginning' ? qty : 0,
-            inQuantity: type === 'in' ? qty : 0,
-            outQuantity: type === 'out' ? qty : 0,
-            spoilage: type === 'spoilage' ? qty : 0,
+            beginning: 0,
+            inQuantity: 0,
+            outQuantity: 0,
+            spoilage: 0,
+            remaining: 0,
             updatedBy: userId
           }, { transaction: t });
-        } else {
-          // Update quantities based on transaction type
-          let updatedFields = {};
-          if (type === 'beginning') {
-            updatedFields.beginning = qty;
-          } else if (type === 'in') {
-            updatedFields.inQuantity = (dailyEntry.inQuantity || 0) + qty;
-          } else if (type === 'out') {
-            updatedFields.outQuantity = (dailyEntry.outQuantity || 0) + qty;
-          } else if (type === 'spoilage') {
-            updatedFields.spoilage = (dailyEntry.spoilage || 0) + qty;
-          }
-
-          await dailyEntry.update(updatedFields, { transaction: t });
         }
 
-        // Recalculate remaining regardless of transaction type
-        const beginningVal = dailyEntry.beginning || 0;
-        const inVal = dailyEntry.inQuantity || 0;
-        const outVal = dailyEntry.outQuantity || 0;
-        const spoilageVal = dailyEntry.spoilage || 0;
+        let beginningVal = Number(dailyEntry.beginning) || 0;
+        let inVal = Number(dailyEntry.inQuantity) || 0;
+        let outVal = Number(dailyEntry.outQuantity) || 0;
+        let spoilageVal = Number(dailyEntry.spoilage) || 0;
 
-        await dailyEntry.update({
-          remaining: Math.max(0, beginningVal + inVal - outVal - spoilageVal),
-          updatedBy: userId
-        }, { transaction: t });
+        const updatedFields = {};
+
+        if (type === 'beginning') {
+          beginningVal = qty;
+          updatedFields.beginning = qty;
+        } else if (type === 'in') {
+          inVal = qty;
+          updatedFields.inQuantity = qty;
+        } else if (type === 'out') {
+          outVal = qty;
+          updatedFields.outQuantity = qty;
+        } else if (type === 'spoilage') {
+          spoilageVal = qty;
+          updatedFields.spoilage = qty;
+        }
+
+        updatedFields.remaining = Math.max(0, beginningVal + inVal - outVal - spoilageVal);
+        updatedFields.updatedBy = userId;
+
+        await dailyEntry.update(updatedFields, { transaction: t });
 
         // Create the transaction
         const newTransaction = await Transaction.create({

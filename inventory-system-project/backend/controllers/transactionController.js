@@ -612,7 +612,6 @@ const createBatchInventoryTransactions = async (req, res) => {
 
         // Parse and validate date
         const transactionDate = new Date(date);
-        const targetDateStr = transactionDate.toISOString().split('T')[0];
         const today = new Date();
         today.setHours(23, 59, 59, 999);
         
@@ -632,6 +631,10 @@ const createBatchInventoryTransactions = async (req, res) => {
           throw new Error(`Inventory item not found: ${inventoryItemId}`);
         }
 
+        // Note: Skipping detailed stock availability check for batch operation performance
+        // Relying on frontend logic or subsequent validation if strict consistency is needed
+        // Or could fetch current stock in one go beforehand if critical
+
         // Handle 'beginning' type transactions specially
         if (type === 'beginning') {
           // Check if a daily inventory record exists for this date
@@ -644,9 +647,17 @@ const createBatchInventoryTransactions = async (req, res) => {
           });
 
           if (dailyEntry) {
+            // Force recalculation of remaining for the CURRENT day only
+            // remaining = new_beginning + in - out - spoilage
+            const currentIn = dailyEntry.inQuantity || 0;
+            const currentOut = dailyEntry.outQuantity || 0;
+            const currentSpoilage = dailyEntry.spoilage || 0;
+            const newRemaining = Math.max(0, qty + currentIn - currentOut - currentSpoilage);
+
             // Update the existing daily entry
             await dailyEntry.update({
               beginning: qty,
+              remaining: newRemaining,
               updatedBy: userId
             }, { transaction: t });
           } else {
@@ -664,7 +675,7 @@ const createBatchInventoryTransactions = async (req, res) => {
           }
         }
 
-        // Create the transaction record (for history)
+        // Create the transaction
         const newTransaction = await Transaction.create({
           inventoryItemId,
           userId,

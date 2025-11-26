@@ -94,15 +94,16 @@ const Inventory = () => {
   };
 
   const calculateTotalInventory = (item) => {
-    const beginning = parseInt(item.beginning) || 0;
-    const inValue = parseInt(item.in) || 0;
+    if (item.name === "Full Tea") console.log('Debug Full Tea:', item);
+    const beginning = Number(item.beginning || 0);
+    const inValue = Number(item.in || 0);
     return beginning + inValue;
   };
 
   const calculateRemaining = (item) => {
     const total = calculateTotalInventory(item);
-    const out = parseInt(item.out) || 0;
-    const spoilage = parseInt(item.spoilage) || 0;
+    const out = Number(item.out || 0);
+    const spoilage = Number(item.spoilage || 0);
     return Math.max(0, total - out - spoilage);
   };
 

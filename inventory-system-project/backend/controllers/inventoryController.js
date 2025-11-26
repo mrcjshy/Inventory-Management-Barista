@@ -209,15 +209,15 @@ const getInventoryByDate = async (req, res) => {
       raw: true
     });
 
-    // Create a map for quick lookup of daily entries
+    // Create a map for quick lookup of daily entries (FORCE STRING KEYS)
     const dailyMap = {};
     dailyInventoryEntries.forEach(entry => {
-      dailyMap[entry.inventoryItemId] = entry;
+      const key = String(entry.inventoryItemId);
+      dailyMap[key] = entry;
     });
 
     // 3. Fetch transactions for calculation fallback
     // Calculate date ranges
-    // Use string manipulation for precise date math to avoid timezone issues
     const targetDateObj = new Date(targetDateStr);
     targetDateObj.setDate(targetDateObj.getDate() - 1);
     const previousDateStr = targetDateObj.toISOString().split('T')[0];
@@ -239,7 +239,8 @@ const getInventoryByDate = async (req, res) => {
       yesterdayMap[key] = entry.remaining;
       console.log(`📥 Storing in yesterdayMap: key="${key}" value=${entry.remaining}`);
     });
-    console.log('Yesterday Map Keys:', Object.keys(yesterdayMap));
+    console.log('✅ Yesterday Map built with keys:', Object.keys(yesterdayMap));
+    console.log('✅ Yesterday Map full contents:', yesterdayMap);
 
     // Fetch ALL relevant transactions in TWO queries
     const previousDayTransactions = await Transaction.findAll({
@@ -268,18 +269,19 @@ const getInventoryByDate = async (req, res) => {
       raw: true
     });
 
-    // Helper function to aggregate transactions by item ID
+    // Helper function to aggregate transactions by item ID (FORCE STRING KEYS)
     const groupTransactionsByItem = (transactions) => {
       const grouped = {};
       transactions.forEach(t => {
-        if (!grouped[t.inventoryItemId]) {
-          grouped[t.inventoryItemId] = { beginning: 0, in: 0, out: 0, spoilage: 0 };
+        const key = String(t.inventoryItemId);
+        if (!grouped[key]) {
+          grouped[key] = { beginning: 0, in: 0, out: 0, spoilage: 0 };
         }
         
-        if (t.type === 'beginning') grouped[t.inventoryItemId].beginning += t.quantity;
-        else if (t.type === 'in') grouped[t.inventoryItemId].in += t.quantity;
-        else if (t.type === 'out') grouped[t.inventoryItemId].out += t.quantity;
-        else if (t.type === 'spoilage') grouped[t.inventoryItemId].spoilage += t.quantity;
+        if (t.type === 'beginning') grouped[key].beginning += t.quantity;
+        else if (t.type === 'in') grouped[key].in += t.quantity;
+        else if (t.type === 'out') grouped[key].out += t.quantity;
+        else if (t.type === 'spoilage') grouped[key].spoilage += t.quantity;
       });
       return grouped;
     };
@@ -291,12 +293,9 @@ const getInventoryByDate = async (req, res) => {
     const computedInventory = inventoryItems.map(item => {
       const itemIdStr = String(item.id);
       
-      // 🔍 DEBUG: Show what we're looking for
-      console.log(`\n🔍 LOOKUP ATTEMPT for "${item.name}"`);
-      console.log(`   - Item ID (original): ${item.id} (type: ${typeof item.id})`);
-      console.log(`   - Item ID (as string): "${itemIdStr}" (type: ${typeof itemIdStr})`);
-      // console.log(`   - Yesterday Map has keys:`, Object.keys(yesterdayMap)); // Too verbose for every item
-      console.log(`   - Looking for key: "${itemIdStr}"`);
+      console.log(`\n🔍 Checking item ${item.name} (ID: "${itemIdStr}")`);
+      // console.log('   Map currently has keys:', Object.keys(yesterdayMap)); // Too verbose
+      console.log('   Direct access test:', yesterdayMap[itemIdStr]);
       
       const yesterdayValue = yesterdayMap[itemIdStr];
       
@@ -304,8 +303,8 @@ const getInventoryByDate = async (req, res) => {
       console.log(`   - Value type: ${typeof yesterdayValue}`);
 
       // PRIORITY 1: If a DailyInventory record exists, use it DIRECTLY
-      if (dailyMap[parseInt(itemIdStr)]) { 
-        const entry = dailyMap[parseInt(itemIdStr)];
+      if (dailyMap[itemIdStr]) { 
+        const entry = dailyMap[itemIdStr];
         console.log(`   ✅ Using TODAY's manual entry`);
         return {
           id: item.id,
@@ -325,9 +324,7 @@ const getInventoryByDate = async (req, res) => {
       }
 
       // PRIORITY 2: Fallback to calculation logic
-      const itemIdInt = parseInt(itemIdStr, 10);
-      const prevTrans = prevDayMap[itemIdInt] || { beginning: 0, in: 0, out: 0, spoilage: 0 };
-      const todayTrans = todayMap[itemIdInt] || { beginning: 0, in: 0, out: 0, spoilage: 0 };
+      const todayTrans = todayMap[itemIdStr] || { beginning: 0, in: 0, out: 0, spoilage: 0 };
 
       // Carry over from yesterday
       const beginning = yesterdayValue !== undefined ? yesterdayValue : 0;

@@ -604,14 +604,17 @@ const createBatchInventoryTransactions = async (req, res) => {
       for (const txn of transactions) {
         const { inventoryItemId, type, quantity, notes, date } = txn;
 
+        // Define targetDateStr immediately to avoid ReferenceErrors
+        const transactionDate = new Date(date);
+        const targetDateStr = transactionDate.toISOString().split('T')[0];
+
         // Validate transaction type
         const validTypes = ['in', 'out', 'spoilage', 'beginning'];
         if (!validTypes.includes(type)) {
           throw new Error(`Invalid transaction type for item ${inventoryItemId}: ${type}`);
         }
 
-        // Parse and validate date
-        const transactionDate = new Date(date);
+        // Validate date
         const today = new Date();
         today.setHours(23, 59, 59, 999);
         

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import { inventoryService, transactionService, settingsService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Category definitions with desired order
 const CATEGORIES = {
@@ -266,7 +268,7 @@ const Inventory = () => {
     return remaining <= lowStockThreshold;
   };
 
-  const groupItems = (items) => {
+  function groupItems(items) {
     const filtered = items.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesFilter = filterBy === 'All Categories' || item.category === filterBy;
@@ -286,6 +288,87 @@ const Inventory = () => {
       category,
       items: grouped[category] || []
     })).filter(group => group.items.length > 0);
+  }
+
+  const handleExportPDF = () => {
+    if (!inventoryData || inventoryData.length === 0) {
+      setError('No inventory data available to export.');
+      return;
+    }
+
+    try {
+      const doc = new jsPDF();
+      const marginX = 14;
+      const title = `Inventory Report - ${selectedDate}`;
+      doc.setFontSize(16);
+      doc.text(title, marginX, 20);
+
+      let currentY = 30;
+      const groupedData = groupItems(inventoryData);
+
+      groupedData.forEach(({ category, items }) => {
+        doc.setFontSize(13);
+        doc.text(category, marginX, currentY);
+        currentY += 6;
+
+        const tableBody = items.map(item => {
+          const beginning = Number(item.beginning || 0);
+          const inValue = Number(item.in || 0);
+          const totalInventory = Number(item.totalInventory || beginning + inValue);
+          const outValue = Number(item.out || 0);
+          const spoilageValue = Number(item.spoilage || 0);
+          const remainingValue = Number(item.remaining || 0);
+
+          return [
+            item.name,
+            item.unit,
+            beginning,
+            inValue,
+            totalInventory,
+            outValue,
+            spoilageValue,
+            remainingValue
+          ];
+        });
+
+        autoTable(doc, {
+          startY: currentY,
+          head: [[
+            'Item Name',
+            'Unit',
+            'Beginning',
+            'In',
+            'Total',
+            'Out',
+            'Spoilage',
+            'Remaining'
+          ]],
+          body: tableBody,
+          styles: { fontSize: 10 },
+          columnStyles: {
+            0: { halign: 'left' },
+            1: { halign: 'left' }
+          },
+          margin: { left: marginX, right: marginX },
+          didParseCell: (data) => {
+            if (data.section === 'body' && data.column.index === 7) {
+              const remainingValue = Number(data.cell.raw);
+              if (!isNaN(remainingValue) && remainingValue <= 5) {
+                data.cell.styles.textColor = [220, 53, 69];
+              }
+            }
+          }
+        });
+
+        currentY = doc.lastAutoTable.finalY + 12;
+      });
+
+      doc.save(`Inventory_Report_${selectedDate}.pdf`);
+      setError(null);
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      setError('Failed to export PDF. Please try again.');
+    }
   };
 
   if (loading) {
@@ -415,6 +498,14 @@ const Inventory = () => {
             
             {user?.role === 'teamlead' && (
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-2">
+                <button 
+                  onClick={handleExportPDF}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center justify-center transition-colors hover:bg-blue-700"
+                >
+                  <span className="hidden sm:inline">📄 Export PDF</span>
+                  <span className="sm:hidden">📄 PDF</span>
+                </button>
+
                 <button 
                   onClick={() => setShowAddModal(true)}
                   className="px-4 py-2 bg-green-600 text-white rounded-md flex items-center justify-center transition-colors hover:bg-green-700"

@@ -637,41 +637,46 @@ const createBatchInventoryTransactions = async (req, res) => {
 
         // Handle 'beginning' type transactions specially
         if (type === 'beginning') {
-          // Check if a daily inventory record exists for this date
-          const dailyEntry = await DailyInventory.findOne({
-            where: {
-              inventoryItemId,
-              date: targetDateStr
-            },
-            transaction: t
-          });
+          try {
+            // Check if a daily inventory record exists for this date
+            const dailyEntry = await DailyInventory.findOne({
+              where: {
+                inventoryItemId,
+                date: targetDateStr
+              },
+              transaction: t
+            });
 
-          if (dailyEntry) {
-            // Force recalculation of remaining for the CURRENT day only
-            // remaining = new_beginning + in - out - spoilage
-            const currentIn = dailyEntry.inQuantity || 0;
-            const currentOut = dailyEntry.outQuantity || 0;
-            const currentSpoilage = dailyEntry.spoilage || 0;
-            const newRemaining = Math.max(0, qty + currentIn - currentOut - currentSpoilage);
+            if (!dailyEntry) {
+               // If it doesn't exist, CREATE it immediately with the new beginning value.
+              await DailyInventory.create({
+                inventoryItemId,
+                date: targetDateStr,
+                beginning: qty,
+                inQuantity: 0,
+                outQuantity: 0,
+                spoilage: 0,
+                remaining: qty, // Will be auto-calculated by hook, but setting initial value
+                updatedBy: userId
+              }, { transaction: t });
+            } else {
+              // If it exists, UPDATE it.
+              // Force recalculation of remaining for the CURRENT day only
+              const currentIn = dailyEntry.inQuantity || 0;
+              const currentOut = dailyEntry.outQuantity || 0;
+              const currentSpoilage = dailyEntry.spoilage || 0;
+              const newRemaining = Math.max(0, qty + currentIn - currentOut - currentSpoilage);
 
-            // Update the existing daily entry
-            await dailyEntry.update({
-              beginning: qty,
-              remaining: newRemaining,
-              updatedBy: userId
-            }, { transaction: t });
-          } else {
-            // Create a new daily entry if it doesn't exist
-            await DailyInventory.create({
-              inventoryItemId,
-              date: targetDateStr,
-              beginning: qty,
-              inQuantity: 0,
-              outQuantity: 0,
-              spoilage: 0,
-              remaining: qty, // Will be auto-calculated by hook, but setting initial value
-              updatedBy: userId
-            }, { transaction: t });
+              // Update the existing daily entry
+              await dailyEntry.update({
+                beginning: qty,
+                remaining: newRemaining,
+                updatedBy: userId
+              }, { transaction: t });
+            }
+          } catch (err) {
+            console.error(`Error updating DailyInventory for item ${inventoryItemId}:`, err);
+            throw new Error(`Failed to update daily inventory for item ${inventoryItemId}: ${err.message}`);
           }
         }
 

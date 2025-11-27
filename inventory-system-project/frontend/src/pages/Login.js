@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 // Using restored images from public folder
-const analyticsImage = "/data_analytics_image.png";
 const baabaaLogo = "/baa_baa_login_logo.png";
 
 // Reusable Input Field Component
@@ -73,63 +72,18 @@ const InputField = ({ id, name, type, placeholder, value, onChange, icon, showPa
   );
 };
 
-// Left Section - Illustration Component
-const IllustrationSection = () => {
-  return (
-    <div className="w-full md:w-1/2 bg-white relative overflow-hidden flex flex-col">
-      {/* Subtle Dot Background Pattern */}
-      <div className="absolute inset-0">
-        <div className="absolute inset-0" style={{ opacity: 0.27 }}>
-          {/* Creating refined dot pattern like the reference image */}
-          <div className="grid grid-cols-24 gap-3 h-full w-full pt-12 p-6">
-            {Array.from({ length: 24 * 18 }).map((_, i) => (
-              <div
-                key={i}
-                className="w-1 h-1 bg-gray-500 rounded-full"
-              ></div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex flex-col h-full w-full relative z-10 p-6 sm:p-8 md:p-12 lg:p-16">
-        {/* Main Title - Centered and single line */}
-        <div className="w-full text-center mb-8 sm:mb-12 md:mb-16">
-          <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-3xl xl:text-4xl font-bold leading-tight whitespace-nowrap" style={{ color: '#68448C' }}>
-            Inventory Management System
-          </h1>
-        </div>
-        
-        {/* 3D Analytics Illustration - Centered in remaining space */}
-        <div className="flex-1 flex justify-center items-center">
-          <div className="flex justify-center w-full">
-            <img 
-              src={analyticsImage} 
-              alt="3D Analytics Illustration" 
-              className="w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl h-auto object-contain"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // Right Section - Login Form Component
 const LoginForm = ({ formData, formError, isLoading, handleChange, handleSubmit, showPassword, handleTogglePassword }) => {
   return (
-    <div className="w-full md:w-1/2 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-white min-h-screen md:min-h-0 relative">
-      {/* Vertical Line - Not full length, positioned in center */}
-      <div className="hidden md:block absolute left-0 top-1/2 transform -translate-y-1/2 bg-gray-300" style={{ height: '90%', width: '3px' }}></div>
+    <div className="w-full max-w-md p-6 sm:p-8 bg-white rounded-2xl shadow-xl">
       
-      <div className="max-w-sm sm:max-w-md w-full space-y-6 sm:space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         {/* Logo */}
         <div className="text-center">
           <img 
             src={baabaaLogo} 
             alt="Baa Baa Logo" 
-            className="mx-auto h-16 w-16 sm:h-20 sm:w-20 object-contain mb-4 sm:mb-6"
+            className="mx-auto h-24 w-24 sm:h-32 sm:w-32 object-contain mb-4 sm:mb-6"
           />
         </div>
 
@@ -213,7 +167,7 @@ const LoginForm = ({ formData, formError, isLoading, handleChange, handleSubmit,
 // Main Login Layout Component
 const LoginLayout = ({ children }) => {
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       {children}
     </div>
   );
@@ -284,7 +238,6 @@ const Login = () => {
 
   return (
     <LoginLayout>
-      <IllustrationSection />
       <LoginForm 
         formData={formData}
         formError={formError}
@@ -298,4 +251,4 @@ const Login = () => {
   );
 };
 
-export default Login; 
+export default Login;

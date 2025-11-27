@@ -193,8 +193,8 @@ const Statistics = () => {
           </div>
 
           {/* Custom Date Range */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-4">
-            <div>
+          <div className="flex flex-col lg:grid lg:grid-cols-5 gap-4 lg:gap-6 mb-4">
+            <div className="w-full">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Start Date
               </label>
@@ -202,11 +202,11 @@ const Statistics = () => {
                 type="date"
                 value={dateRange.startDate}
                 onChange={(e) => handleDateRangeChange('startDate', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white appearance-none shadow-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white appearance-none shadow-sm h-[42px]"
               />
             </div>
             
-            <div>
+            <div className="w-full">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 End Date
               </label>
@@ -214,11 +214,11 @@ const Statistics = () => {
                 type="date"
                 value={dateRange.endDate}
                 onChange={(e) => handleDateRangeChange('endDate', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white appearance-none shadow-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white appearance-none shadow-sm h-[42px]"
               />
             </div>
 
-            <div>
+            <div className="w-full">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Product Name
               </label>
@@ -227,18 +227,18 @@ const Statistics = () => {
                 placeholder="Search products..."
                 value={filters.productName}
                 onChange={(e) => handleFilterChange('productName', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white appearance-none shadow-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white appearance-none shadow-sm h-[42px]"
               />
             </div>
 
-            <div>
+            <div className="w-full">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Transaction Type
               </label>
               <select
                 value={filters.type}
                 onChange={(e) => handleFilterChange('type', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white appearance-none shadow-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white appearance-none shadow-sm h-[42px]"
               >
                 <option value="">All Types</option>
                 <option value="in">In</option>
@@ -247,10 +247,10 @@ const Statistics = () => {
               </select>
             </div>
 
-            <div className="flex items-end">
+            <div className="w-full flex items-end">
               <button
                 onClick={handleClearFilters}
-                className="w-full px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                className="w-full px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors h-[42px] flex items-center justify-center"
               >
                 Clear Filters
               </button>

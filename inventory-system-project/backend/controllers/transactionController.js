@@ -648,14 +648,30 @@ const createBatchInventoryTransactions = async (req, res) => {
         });
 
         if (!dailyEntry) {
+          // 1. Find yesterday's record to get the carry-over
+          const prevDate = new Date(transactionDate);
+          prevDate.setDate(prevDate.getDate() - 1);
+          const prevDateStr = prevDate.toISOString().split('T')[0];
+
+          const prevRecord = await DailyInventory.findOne({
+            where: { inventoryItemId, date: prevDateStr },
+            transaction: t
+          });
+
+          const carryOver = prevRecord ? Number(prevRecord.remaining) : 0;
+
+          // 2. Determine correct Beginning for the new record
+          // If the user is editing 'beginning', use their value. Otherwise, use carryOver.
+          const initialBeginning = (type === 'beginning') ? qty : carryOver;
+
           dailyEntry = await DailyInventory.create({
             inventoryItemId,
             date: targetDateStr,
-            beginning: 0,
+            beginning: initialBeginning,
             inQuantity: 0,
             outQuantity: 0,
             spoilage: 0,
-            remaining: 0,
+            remaining: initialBeginning, // Initial remaining matches beginning before adding the current transaction logic below
             updatedBy: userId
           }, { transaction: t });
         }

@@ -413,10 +413,10 @@ const Inventory = () => {
           <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
             
             {/* Date Selection Container */}
-            <div className="flex flex-col w-full gap-3 sm:flex-row sm:items-end sm:w-auto">
+            <div className="flex flex-col w-full gap-3 md:flex-row md:items-end md:w-auto">
               
               {/* Date Input Wrapper */}
-              <div className="w-full sm:w-auto flex flex-col">
+              <div className="w-full md:w-auto flex flex-col">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Select Date
                 </label>
@@ -425,13 +425,13 @@ const Inventory = () => {
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
                   max={new Date().toISOString().split('T')[0]}
-                  className="block w-full h-12 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:w-auto sm:h-[42px] bg-white appearance-none"
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 md:w-auto bg-white appearance-none"
                 />
               </div>
               
               {/* Status Badge - Today */}
               {isToday() && (
-                <div className="flex items-center justify-center px-3 py-2 bg-green-50 border border-green-200 rounded-md w-full h-12 sm:w-auto sm:h-[42px] sm:justify-start">
+                <div className="flex items-center justify-center px-3 py-2 bg-green-50 border border-green-200 rounded-md w-full md:w-auto md:justify-start">
                   <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -441,7 +441,7 @@ const Inventory = () => {
               
               {/* Status Badge - Historical */}
               {!isToday() && (
-                <div className="flex items-center justify-center px-3 py-2 bg-orange-50 border border-orange-200 rounded-md w-full h-12 sm:w-auto sm:h-[42px] sm:justify-start">
+                <div className="flex items-center justify-center px-3 py-2 bg-orange-50 border border-orange-200 rounded-md w-full md:w-auto md:justify-start">
                   <svg className="w-5 h-5 text-orange-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>

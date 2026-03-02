@@ -54,7 +54,7 @@ const getSetting = async (req, res) => {
 
     let value = setting.value;
     
-    // Parse value based on type
+  
     switch (setting.type) {
       case 'number':
         value = parseFloat(value);
@@ -80,7 +80,7 @@ const getSetting = async (req, res) => {
   } catch (error) {
     res.status(500).json({ 
       message: 'Error fetching setting', 
-      error: error.message 
+      
     });
   }
 };

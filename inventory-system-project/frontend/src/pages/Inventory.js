@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
+import MobileInventoryCard from '../components/MobileInventoryCard';
 import { inventoryService, transactionService, settingsService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import jsPDF from 'jspdf';
@@ -375,7 +376,7 @@ const Inventory = () => {
     return (
       <div className="flex min-h-screen bg-gray-50">
         <Sidebar />
-        <div className="ml-48 flex justify-center items-center w-full">
+        <div className="lg:ml-48 flex justify-center items-center w-full">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
         </div>
       </div>
@@ -552,85 +553,105 @@ const Inventory = () => {
           </div>
         )}
 
-        {/* Inventory Table */}
+        {/* Inventory Content */}
         <div className="space-y-6">
           {groupItems(inventoryData).map(({ category, items }) => (
             items.length > 0 && (
-              <div key={category} className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="text-white px-6 py-4" style={{ backgroundColor: '#68448C' }}>
-                  <h3 className="text-lg font-semibold">{category}</h3>
-                </div>
-                
-                <div className="overflow-x-auto">
-                  <table className="min-w-full">
-                    <thead>
-                      <tr className="bg-gray-50 border-b">
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item name</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Beginning</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">In</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Inventory</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Out</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Spoilage</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remaining</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {items.map((item) => (
-                        <tr key={item.id} className={`hover:bg-gray-50 ${pendingChanges[item.id] ? 'bg-yellow-50' : ''}`}>
-                          <td className="px-6 py-2 font-medium">{item.name}</td>
-                          <td className="px-6 py-2">{item.unit}</td>
-                          <td className="px-6 py-2">
-                            <input
-                              type="number"
-                              min="0"
-                              className="w-16 sm:w-20 p-1 border rounded focus:ring-2 focus:ring-purple-500 text-sm"
-                              value={item.beginning || ''}
-                              onChange={(e) => handleInputChange(item.id, 'beginning', e.target.value)}
-                            />
-                          </td>
-                          <td className="px-6 py-2">
-                            <input
-                              type="number"
-                              min="0"
-                              className="w-16 sm:w-20 p-1 border rounded focus:ring-2 focus:ring-purple-500 text-sm"
-                              value={item.in || ''}
-                              onChange={(e) => handleInputChange(item.id, 'in', e.target.value)}
-                            />
-                          </td>
-                          <td className="px-6 py-2 font-medium">{item.totalInventory || 0}</td>
-                          <td className="px-6 py-2">
-                            <input
-                              type="number"
-                              min="0"
-                              className="w-16 sm:w-20 p-1 border rounded focus:ring-2 focus:ring-purple-500 text-sm"
-                              value={item.out || ''}
-                              onChange={(e) => handleInputChange(item.id, 'out', e.target.value)}
-                            />
-                          </td>
-                          <td className="px-6 py-2">
-                            <input
-                              type="number"
-                              min="0"
-                              className="w-16 sm:w-20 p-1 border rounded focus:ring-2 focus:ring-purple-500 text-sm"
-                              value={item.spoilage || ''}
-                              onChange={(e) => handleInputChange(item.id, 'spoilage', e.target.value)}
-                            />
-                          </td>
-                          <td className="px-6 py-2">
-                            <span className={`font-medium ${isLowStock(item.remaining) ? 'text-red-600' : 'text-gray-900'}`}>
-                              {item.remaining || 0}
-                              {isLowStock(item.remaining) && (
-                                <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
-                                  LOW STOCK
-                                </span>
-                              )}
-                            </span>
-                          </td>
+              <div key={category}>
+                {/* Desktop Table (lg and up) */}
+                <div className="hidden lg:block bg-white rounded-lg shadow overflow-hidden">
+                  <div className="text-white px-6 py-4" style={{ backgroundColor: '#68448C' }}>
+                    <h3 className="text-lg font-semibold">{category}</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                      <thead>
+                        <tr className="bg-gray-50 border-b">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item name</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Beginning</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">In</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Inventory</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Out</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Spoilage</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remaining</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {items.map((item) => (
+                          <tr key={item.id} className={`hover:bg-gray-50 ${pendingChanges[item.id] ? 'bg-yellow-50' : ''}`}>
+                            <td className="px-6 py-2 font-medium">{item.name}</td>
+                            <td className="px-6 py-2">{item.unit}</td>
+                            <td className="px-6 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                className="w-20 p-1 border rounded focus:ring-2 focus:ring-purple-500 text-sm"
+                                value={item.beginning || ''}
+                                onChange={(e) => handleInputChange(item.id, 'beginning', e.target.value)}
+                              />
+                            </td>
+                            <td className="px-6 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                className="w-20 p-1 border rounded focus:ring-2 focus:ring-purple-500 text-sm"
+                                value={item.in || ''}
+                                onChange={(e) => handleInputChange(item.id, 'in', e.target.value)}
+                              />
+                            </td>
+                            <td className="px-6 py-2 font-medium">{item.totalInventory || 0}</td>
+                            <td className="px-6 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                className="w-20 p-1 border rounded focus:ring-2 focus:ring-purple-500 text-sm"
+                                value={item.out || ''}
+                                onChange={(e) => handleInputChange(item.id, 'out', e.target.value)}
+                              />
+                            </td>
+                            <td className="px-6 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                className="w-20 p-1 border rounded focus:ring-2 focus:ring-purple-500 text-sm"
+                                value={item.spoilage || ''}
+                                onChange={(e) => handleInputChange(item.id, 'spoilage', e.target.value)}
+                              />
+                            </td>
+                            <td className="px-6 py-2">
+                              <span className={`font-medium ${isLowStock(item.remaining) ? 'text-red-600' : 'text-gray-900'}`}>
+                                {item.remaining || 0}
+                                {isLowStock(item.remaining) && (
+                                  <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
+                                    LOW STOCK
+                                  </span>
+                                )}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Mobile Cards (below lg) */}
+                <div className="lg:hidden">
+                  <div className="rounded-lg px-4 py-3 mb-3 text-white font-semibold text-base" style={{ backgroundColor: '#68448C' }}>
+                    {category}
+                  </div>
+                  <div className="space-y-3">
+                    {items.map((item) => (
+                      <MobileInventoryCard
+                        key={item.id}
+                        item={item}
+                        isLowStock={isLowStock}
+                        hasPendingChange={!!pendingChanges[item.id]}
+                        onInputChange={handleInputChange}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             )
@@ -640,7 +661,7 @@ const Inventory = () => {
         {/* Add Item Modal */}
         {user?.role === 'teamlead' && showAddModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg w-96 max-h-96 overflow-y-auto">
+            <div className="bg-white p-6 rounded-lg w-full max-w-sm mx-4 max-h-[90vh] overflow-y-auto">
               <h2 className="text-xl font-bold mb-4" style={{ color: '#68448C' }}>Add New Item</h2>
               <div className="space-y-4">
                 <div>
@@ -709,7 +730,7 @@ const Inventory = () => {
         {/* Remove Item Modal */}
         {user?.role === 'teamlead' && showRemoveModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg w-96">
+            <div className="bg-white p-6 rounded-lg w-full max-w-sm mx-4">
               <h2 className="text-xl font-bold mb-4 text-red-600">Remove Item</h2>
               <div className="space-y-4">
                 <div>

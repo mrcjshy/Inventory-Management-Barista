@@ -1,9 +1,10 @@
 // DARRYL YAM C. CANDILADA - BSIT 2-I
 
 const { Sequelize } = require('sequelize');
+const path = require('path');
 const dotenv = require('dotenv');
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '..', '.env'), override: true });
 
 let sequelize;
 
@@ -31,7 +32,7 @@ if (process.env.DATABASE_URL) {
   sequelize = new Sequelize(
     process.env.DB_NAME || 'inventory_db',
     process.env.DB_USER || 'postgres',
-    process.env.DB_PASSWORD, // Removed hardcoded fallback password
+    process.env.DB_PASSWORD || '09057644429',
     {
       host: process.env.DB_HOST || 'localhost',
       port: process.env.DB_PORT || 5432,

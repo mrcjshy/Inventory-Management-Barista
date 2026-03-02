@@ -215,12 +215,7 @@ const getInventoryByDate = async (req, res) => {
       raw: true
     });
 
-    console.log(`📅 Date: ${date}`);
-    console.log(`📅 Yesterday: ${yesterdayDateStr}`);
-    console.log(`📦 Today records found: ${todayRecords.length}`);
-    console.log(`📦 Yesterday records found: ${yesterdayRecords.length}`);
-
-    // 5. Build lookup maps - Checking both inventoryItemId and item_id as requested
+    // 5. Build lookup maps
     const todayLookup = {};
     todayRecords.forEach(r => {
       const key = String(r.inventoryItemId || r.item_id); 
@@ -231,7 +226,6 @@ const getInventoryByDate = async (req, res) => {
     yesterdayRecords.forEach(r => {
       const key = String(r.inventoryItemId || r.item_id); 
       yesterdayLookup[key] = r.remaining;
-      console.log(`✅ Stored yesterday: ID=${key}, remaining=${r.remaining}`);
     });
 
     // 6. Build response for each item
@@ -239,10 +233,6 @@ const getInventoryByDate = async (req, res) => {
       const itemId = String(item.id);
       const todayData = todayLookup[itemId];
       const yesterdayRemaining = yesterdayLookup[itemId] || 0;
-
-      console.log(`\n🔍 ${item.name} (ID: ${itemId})`);
-      console.log(`   Yesterday remaining: ${yesterdayRemaining}`);
-      console.log(`   Today has entry: ${!!todayData}`);
 
       // If today has data, use it
       if (todayData) {

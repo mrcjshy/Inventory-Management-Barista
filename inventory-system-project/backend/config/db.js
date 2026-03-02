@@ -30,9 +30,9 @@ if (process.env.DATABASE_URL) {
 } else {
   // Local Development: Use individual variables
   sequelize = new Sequelize(
-    process.env.DB_NAME || 'inventory_db',
-    process.env.DB_USER || 'postgres',
-    process.env.DB_PASSWORD || '09057644429',
+    process.env.DB_NAME,
+    process.env.DB_USER,
+    process.env.DB_PASSWORD,
     {
       host: process.env.DB_HOST || 'localhost',
       port: process.env.DB_PORT || 5432,

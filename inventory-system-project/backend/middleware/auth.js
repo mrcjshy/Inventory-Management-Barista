@@ -13,7 +13,7 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_key');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Find user by id
     const user = await User.findByPk(decoded.id);

@@ -1092,8 +1092,6 @@ const seedDatabase = async () => {
     }
 
     console.log('Database seeding completed successfully!');
-    console.log('Admin User: username: teamlead, password: teamlead123');
-    console.log('Staff User: username: barista, password: barista123');
   } catch (error) {
     console.error('Error seeding database:', error);
     throw error;
